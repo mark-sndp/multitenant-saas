@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -21,6 +23,7 @@ import java.util.UUID;
  */
 public class TenantResolutionFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(TenantResolutionFilter.class);
     private static final String TRACE_ID_MDC_KEY = "traceId";
     private static final String TENANT_ID_MDC_KEY = "tenantId";
     private static final String USER_ID_MDC_KEY = "userId";
@@ -53,6 +56,13 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
         String tenantId = jwt.getClaimAsString(properties.getTenantClaim());
 
         TenantContext.set(tenantId, isPlatformAdmin);
+        if (tenantId == null && !isPlatformAdmin) {
+            log.warn("Authenticated non-platform-admin subject={} has no tenant claim {}",
+                jwt.getSubject(), properties.getTenantClaim());
+        } else {
+            log.debug("Resolved tenant context for subject={}: tenantId={}, bypassRls={}",
+                jwt.getSubject(), tenantId, isPlatformAdmin);
+        }
         MDC.put(USER_ID_MDC_KEY, jwt.getSubject());
         if (tenantId != null) {
             MDC.put(TENANT_ID_MDC_KEY, tenantId);

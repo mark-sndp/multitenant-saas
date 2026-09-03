@@ -1,5 +1,7 @@
 package com.acme.saas.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -19,6 +21,8 @@ import java.util.stream.Stream;
  */
 public class JwtRoleConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtRoleConverter.class);
+
     private final JwtGrantedAuthoritiesConverter scopeConverter = new JwtGrantedAuthoritiesConverter();
 
     @Override
@@ -27,6 +31,8 @@ public class JwtRoleConverter implements Converter<Jwt, AbstractAuthenticationTo
                 scopeConverter.convert(jwt).stream(),
                 extractRealmRoles(jwt).stream()
         ).collect(Collectors.toSet());
+        log.debug("Converted JWT authentication for subject={} with {} authorities",
+            jwt.getSubject(), authorities.size());
         return new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt, authorities);
     }
 

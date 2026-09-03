@@ -1,5 +1,7 @@
 package com.acme.saas.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 import javax.sql.DataSource;
@@ -15,6 +17,8 @@ import java.lang.reflect.Proxy;
  * so the SET LOCAL values stay in effect for the whole unit of work.
  */
 public class TenantAwareDataSource extends DelegatingDataSource {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantAwareDataSource.class);
 
     public TenantAwareDataSource(DataSource targetDataSource) {
         super(targetDataSource);
@@ -40,6 +44,12 @@ public class TenantAwareDataSource extends DelegatingDataSource {
         try (Statement statement = connection.createStatement()) {
             statement.execute("SET app.current_tenant = '" + sanitize(tenantId) + "'");
             statement.execute("SET app.bypass_rls = '" + bypassRls + "'");
+            log.debug("Applied RLS context to database connection: tenantId={}, bypassRls={}",
+                    tenantId, bypassRls);
+        } catch (SQLException exception) {
+            log.error("Failed to apply RLS context to database connection: tenantId={}, bypassRls={}",
+                    tenantId, bypassRls, exception);
+            throw exception;
         }
         return resetOnClose(connection);
     }
