@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: acme_owner
+      POSTGRES_PASSWORD: acme_owner
+      POSTGRES_DB: acme_saas
+    ports:
+      - "5432:5432"
+    volumes:
+      - acme_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acme_owner -d acme_saas"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      # Fixes the "iss" claim to this internal hostname:port regardless of which host:port a
+      # client (e.g. curl on the host machine via localhost:8081) used to reach Keycloak,
+      # so it always matches the app's issuer-uri (resolved over the compose network).
+      # Must be a full URL: the hostname-v2 provider (default since KC 24) otherwise still
+      # derives the port from the client's request instead of KC_HOSTNAME_PORT.
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    volumes:
+      - ./src/main/resources/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  app:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: acme_saas
+      DB_USER: acme_app
+      DB_PASSWORD: acme_app
+      DB_MIGRATION_USER: acme_owner
+      DB_MIGRATION_PASSWORD: acme_owner
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/acme
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+volumes:
+  acme_pgdata:

@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: acme-multitenant-saas
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:acme_saas}
+    username: ${DB_USER:acme_app}
+    password: ${DB_PASSWORD:acme_app}
+    hikari:
+      pool-name: acme-hikari
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 5000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        format_sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    # migrations run as a superuser/owner role that can ALTER TABLE ... ENABLE ROW LEVEL SECURITY
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:acme_saas}
+    user: ${DB_MIGRATION_USER:acme_owner}
+    password: ${DB_MIGRATION_PASSWORD:acme_owner}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/acme}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,flyway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+
+acme:
+  keycloak:
+    admin-role: platform-admin
+    tenant-admin-role: tenant-admin
+    tenant-user-role: tenant-user
+    tenant-claim: tenant_id
+
+logging:
+  config: classpath:logback-spring.xml
